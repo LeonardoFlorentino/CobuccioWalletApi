@@ -8,6 +8,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -30,5 +31,21 @@ class User extends Authenticatable
             'password' => 'hashed',
             'user_type' => UserType::class,
         ];
+    }
+
+    /**
+     * Get the transactions made by this user.
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    /**
+     * Get the transfers received by this user.
+     */
+    public function receivedTransfers(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'recipient_user_id');
     }
 }
