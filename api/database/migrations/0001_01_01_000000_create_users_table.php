@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->decimal('balance', 10, 2)->default(0);
+            $table->string('user_type')->default('regular');
             $table->rememberToken();
             $table->timestamps();
         });
