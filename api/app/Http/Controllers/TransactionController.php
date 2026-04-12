@@ -15,6 +15,7 @@ use App\Support\WalletRules;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TransactionController extends Controller
 {
@@ -47,12 +48,26 @@ class TransactionController extends Controller
 
             $currentUser = User::findOrFail($authUser->id);
 
+            Log::info('wallet.deposit.completed', [
+                'actor_user_id' => $authUser->id,
+                'transaction_id' => $transaction->id,
+                'amount' => $amount,
+                'status' => TransactionStatus::COMPLETED->value,
+                'new_balance' => (float) $currentUser->balance,
+            ]);
+
             return response()->json([
                 'message' => 'Deposit created successfully.',
                 'transaction' => $transaction->load('user'),
                 'new_balance' => $currentUser->balance,
             ], 201);
         } catch (\Exception $e) {
+            Log::error('wallet.deposit.failed', [
+                'actor_user_id' => $authUser?->id,
+                'amount' => $amount,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to create deposit.',
                 'error' => $e->getMessage(),
@@ -84,10 +99,23 @@ class TransactionController extends Controller
                 $recipient = $lockedUsers->get($recipientId);
 
                 if (! $user || ! $recipient) {
+                    Log::warning('wallet.transfer.rejected.user_not_found', [
+                        'actor_user_id' => $authUser->id,
+                        'recipient_user_id' => $recipientId,
+                        'amount' => $amount,
+                    ]);
+
                     abort(404, 'User not found.');
                 }
 
                 if (! WalletRules::hasSufficientBalance((float) $user->balance, $amount)) {
+                    Log::warning('wallet.transfer.rejected.insufficient_balance', [
+                        'actor_user_id' => $user->id,
+                        'recipient_user_id' => $recipient->id,
+                        'available_balance' => (float) $user->balance,
+                        'required_amount' => $amount,
+                    ]);
+
                     throw new HttpResponseException(response()->json([
                         'message' => 'Insufficient balance for this transfer.',
                         'available_balance' => $user->balance,
@@ -118,6 +146,16 @@ class TransactionController extends Controller
             $user = User::findOrFail($authUser->id);
             $recipient = User::findOrFail($recipientId);
 
+            Log::info('wallet.transfer.completed', [
+                'actor_user_id' => $authUser->id,
+                'recipient_user_id' => $recipient->id,
+                'transaction_id' => $transaction->id,
+                'amount' => $amount,
+                'status' => TransactionStatus::COMPLETED->value,
+                'actor_new_balance' => (float) $user->balance,
+                'recipient_new_balance' => (float) $recipient->balance,
+            ]);
+
             return response()->json([
                 'message' => 'Transfer created successfully.',
                 'transaction' => $transaction->load(['user', 'recipient']),
@@ -125,8 +163,21 @@ class TransactionController extends Controller
                 'recipient_new_balance' => $recipient->balance,
             ], 201);
         } catch (HttpResponseException $e) {
+            Log::warning('wallet.transfer.rejected', [
+                'actor_user_id' => $authUser?->id,
+                'recipient_user_id' => $recipientId,
+                'amount' => $amount,
+            ]);
+
             return $e->getResponse();
         } catch (\Exception $e) {
+            Log::error('wallet.transfer.failed', [
+                'actor_user_id' => $authUser?->id,
+                'recipient_user_id' => $recipientId,
+                'amount' => $amount,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to create transfer.',
                 'error' => $e->getMessage(),
@@ -142,6 +193,7 @@ class TransactionController extends Controller
         $user = auth()->user();
         $transactionId = (int) $request->validated('transaction_id');
         $reason = $request->validated('reason');
+        $actorUserId = $user->id;
 
         $isAdmin = $user->user_type === UserType::ADMIN;
 
@@ -149,6 +201,11 @@ class TransactionController extends Controller
 
         // Only admins or the transaction owner can reverse
         if (! $isAdmin && $transaction->user_id !== $user->id) {
+            Log::warning('wallet.reverse.rejected.unauthorized', [
+                'actor_user_id' => $user->id,
+                'transaction_id' => $transactionId,
+            ]);
+
             return response()->json([
                 'message' => 'You are not authorized to reverse this transaction.',
             ], 403);
@@ -156,16 +213,26 @@ class TransactionController extends Controller
 
         // Cannot reverse already reversed transactions
         if ($transaction->status === TransactionStatus::REVERSED) {
+            Log::warning('wallet.reverse.rejected.already_reversed', [
+                'actor_user_id' => $user->id,
+                'transaction_id' => $transactionId,
+            ]);
+
             return response()->json([
                 'message' => 'This transaction has already been reversed.',
             ], 422);
         }
 
         try {
-            $reversalTransaction = DB::transaction(function () use ($transactionId, $reason) {
+            $reversalTransaction = DB::transaction(function () use ($transactionId, $reason, $actorUserId) {
                 $transaction = Transaction::query()->lockForUpdate()->findOrFail($transactionId);
 
                 if ($transaction->status === TransactionStatus::REVERSED) {
+                    Log::warning('wallet.reverse.rejected.already_reversed', [
+                        'actor_user_id' => $actorUserId,
+                        'transaction_id' => $transactionId,
+                    ]);
+
                     throw new HttpResponseException(response()->json([
                         'message' => 'This transaction has already been reversed.',
                     ], 422));
@@ -179,12 +246,28 @@ class TransactionController extends Controller
                 }
 
                 if ($transaction->type === TransactionType::DEPOSIT && ! WalletRules::canReverseDeposit((float) $owner->balance, (float) $transaction->amount)) {
+                    Log::warning('wallet.reverse.rejected.deposit_negative_balance', [
+                        'actor_user_id' => $actorUserId,
+                        'transaction_id' => $transactionId,
+                        'owner_user_id' => $owner->id,
+                        'owner_balance' => (float) $owner->balance,
+                        'amount' => (float) $transaction->amount,
+                    ]);
+
                     throw new HttpResponseException(response()->json([
                         'message' => 'Cannot reverse this deposit because it would create a negative balance.',
                     ], 422));
                 }
 
                 if ($transaction->type === TransactionType::TRANSFER && $recipient && ! WalletRules::canReverseTransfer((float) $recipient->balance, (float) $transaction->amount)) {
+                    Log::warning('wallet.reverse.rejected.transfer_recipient_insufficient', [
+                        'actor_user_id' => $actorUserId,
+                        'transaction_id' => $transactionId,
+                        'recipient_user_id' => $recipient->id,
+                        'recipient_balance' => (float) $recipient->balance,
+                        'amount' => (float) $transaction->amount,
+                    ]);
+
                     throw new HttpResponseException(response()->json([
                         'message' => 'Cannot reverse this transfer because recipient balance is insufficient.',
                     ], 422));
@@ -223,6 +306,14 @@ class TransactionController extends Controller
 
             $transaction = Transaction::findOrFail($transactionId);
 
+            Log::info('wallet.reverse.completed', [
+                'actor_user_id' => $user->id,
+                'transaction_id' => $transactionId,
+                'reversal_transaction_id' => $reversalTransaction->id,
+                'reason' => $reason,
+                'status' => TransactionStatus::REVERSED->value,
+            ]);
+
             return response()->json([
                 'message' => 'Transaction reversed successfully.',
                 'original_transaction' => $transaction,
@@ -230,8 +321,21 @@ class TransactionController extends Controller
                 'reason' => $reason,
             ], 200);
         } catch (HttpResponseException $e) {
+            Log::warning('wallet.reverse.rejected', [
+                'actor_user_id' => $user?->id,
+                'transaction_id' => $transactionId,
+                'reason' => $reason,
+            ]);
+
             return $e->getResponse();
         } catch (\Exception $e) {
+            Log::error('wallet.reverse.failed', [
+                'actor_user_id' => $user?->id,
+                'transaction_id' => $transactionId,
+                'reason' => $reason,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to reverse transaction.',
                 'error' => $e->getMessage(),
