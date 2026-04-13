@@ -14,12 +14,112 @@ The project covers:
 
 - PHP 8.3
 - Laravel 13
-- MySQL (runtime)
+- SQLite (runtime via Docker)
 - SQLite in-memory (tests)
 - Laravel Sanctum (token auth)
 - GitHub Actions (CI)
 
+## Architecture
+
+### Layer Diagram
+
+```mermaid
+graph TD
+    Client["Client (Postman / Frontend)"]
+    MW["Middleware Layer\nauth:sanctum · throttle:auth · throttle:wallet"]
+    FR["Form Requests\nValidation & Authorization"]
+    CT["Controllers\nAuthController · TransactionController · UserController"]
+    SV["WalletService\ndeposit · transfer · reverse"]
+    WR["WalletRules\nhasSufficientBalance · canReverseDeposit · canReverseTransfer"]
+    MD["Models\nUser · Transaction"]
+    DB[("SQLite\ndatabase.sqlite")]
+
+    Client --> MW
+    MW --> FR
+    FR --> CT
+    CT --> SV
+    SV --> WR
+    SV --> MD
+    MD --> DB
+```
+
+### Transfer Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant API as TransactionController
+    participant Service as WalletService
+    participant DB as Database
+
+    User->>API: POST /api/transactions/transfer
+    API->>API: Validate token (Sanctum)
+    API->>API: Validate request (TransferRequest)
+    API->>Service: transfer(user, recipientId, amount)
+    Service->>DB: BEGIN TRANSACTION
+    Service->>DB: SELECT users WHERE id IN (...) FOR UPDATE
+    Service->>Service: Check sufficient balance (WalletRules)
+    alt Insufficient balance
+        Service-->>API: HttpResponseException 422
+        API-->>User: 422 Insufficient balance
+    else Sufficient balance
+        Service->>DB: INSERT transactions
+        Service->>DB: UPDATE user balance - amount
+        Service->>DB: UPDATE recipient balance + amount
+        Service->>DB: COMMIT
+        Service-->>API: transaction + updated balances
+        API-->>User: 201 Transfer created
+    end
+```
+
+### Data Model
+
+```mermaid
+erDiagram
+    users {
+        bigint id PK
+        string name
+        string email
+        string password
+        decimal balance
+        enum user_type "regular, admin"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    transactions {
+        bigint id PK
+        bigint user_id FK
+        bigint recipient_user_id FK
+        bigint original_transaction_id FK
+        enum type "deposit, transfer"
+        enum status "completed, reversed"
+        decimal amount
+        string description
+        string reversal_reason
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    personal_access_tokens {
+        bigint id PK
+        string tokenable_type
+        bigint tokenable_id FK
+        string name
+        string token
+        timestamp last_used_at
+        timestamp expires_at
+    }
+
+    users ||--o{ transactions : "makes"
+    users ||--o{ transactions : "receives"
+    transactions ||--o| transactions : "reversed by"
+    users ||--o{ personal_access_tokens : "owns"
+```
+
 ## Setup
+
+### With Docker (recommended)
 
 1. Install dependencies:
 
@@ -36,20 +136,27 @@ cp .env.example .env
 3. Generate app key:
 
 ```bash
-php artisan key:generate
+./vendor/bin/sail artisan key:generate
 ```
 
-4. Run migrations:
+4. Start containers:
 
 ```bash
-php artisan migrate
+./vendor/bin/sail up -d
 ```
 
-5. Start the server:
+5. Run migrations:
 
 ```bash
-php artisan serve
+./vendor/bin/sail artisan migrate
 ```
+
+6. Access the API at `http://localhost:8080`
+
+### Without Docker
+
+1. Install dependencies and configure `.env` with `DB_CONNECTION=sqlite`.
+2. Run `php artisan key:generate && php artisan migrate && php artisan serve`.
 
 ## Authentication
 
