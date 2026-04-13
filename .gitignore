@@ -4,3 +4,6 @@
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local documentation (not for GitHub)
+.documentation-local/
