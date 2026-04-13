@@ -11,17 +11,18 @@ O projeto é composto por uma API REST que pode ser consumida por qualquer clien
 O sistema permite que usuários se cadastrem, façam login, movimentem saldo em suas carteiras e consultem seu histórico de transações.
 
 Cada usuário possui:
+
 - Uma conta identificada por e-mail e senha
 - Um saldo em carteira (`balance`)
 - Um tipo de conta: `regular` (padrão) ou `admin`
 
 As operações financeiras disponíveis são:
 
-| Operação | Descrição |
-|---|---|
-| **Depósito** | O usuário adiciona saldo à própria carteira |
-| **Transferência** | O usuário envia saldo para outro usuário |
-| **Estorno** | Cancela uma transação anterior, devolvendo os saldos |
+| Operação          | Descrição                                            |
+| ----------------- | ---------------------------------------------------- |
+| **Depósito**      | O usuário adiciona saldo à própria carteira          |
+| **Transferência** | O usuário envia saldo para outro usuário             |
+| **Estorno**       | Cancela uma transação anterior, devolvendo os saldos |
 
 Toda operação financeira gera um registro na tabela `transactions`, que mantém o histórico completo. Um estorno cria uma nova transação vinculada à original.
 
@@ -29,15 +30,15 @@ Toda operação financeira gera um registro na tabela `transactions`, que manté
 
 ## Tech Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Linguagem | PHP 8.3 |
-| Framework | Laravel 13 |
-| Autenticação | Laravel Sanctum (Bearer Token) |
-| Banco de dados (runtime) | SQLite via Docker |
-| Banco de dados (testes) | SQLite in-memory |
-| Containers | Docker + Laravel Sail |
-| CI | GitHub Actions |
+| Camada                   | Tecnologia                     |
+| ------------------------ | ------------------------------ |
+| Linguagem                | PHP 8.3                        |
+| Framework                | Laravel 13                     |
+| Autenticação             | Laravel Sanctum (Bearer Token) |
+| Banco de dados (runtime) | SQLite via Docker              |
+| Banco de dados (testes)  | SQLite in-memory               |
+| Containers               | Docker + Laravel Sail          |
+| CI                       | GitHub Actions                 |
 
 ---
 
@@ -217,6 +218,7 @@ A pasta `api/postman/` contém:
 - `postman-environment-local.json` — variáveis de ambiente para rodar localmente
 
 **Para importar:**
+
 1. Abra o Postman
 2. Importe o arquivo de coleção
 3. Importe o arquivo de ambiente e selecione como ambiente ativo

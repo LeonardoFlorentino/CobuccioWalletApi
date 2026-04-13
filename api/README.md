@@ -22,10 +22,10 @@ Rotas marcadas com 🔒 exigem autenticação.
 
 ## Rate Limiting
 
-| Grupo | Limite |
-|---|---|
+| Grupo                                      | Limite                |
+| ------------------------------------------ | --------------------- |
 | `POST /auth/register` e `POST /auth/login` | 10 requisições/minuto |
-| Rotas de transações | 60 requisições/minuto |
+| Rotas de transações                        | 60 requisições/minuto |
 
 Exceder o limite retorna `429 Too Many Requests`.
 
@@ -54,12 +54,12 @@ Registra um novo usuário e retorna um token de acesso.
 
 **Request body:**
 
-| Campo | Tipo | Obrigatório | Regras |
-|---|---|---|---|
-| `name` | string | ✅ | máx. 255 caracteres |
-| `email` | string | ✅ | e-mail válido, único |
-| `password` | string | ✅ | mín. 8 caracteres |
-| `password_confirmation` | string | ✅ | deve ser igual ao `password` |
+| Campo                   | Tipo   | Obrigatório | Regras                       |
+| ----------------------- | ------ | ----------- | ---------------------------- |
+| `name`                  | string | ✅          | máx. 255 caracteres          |
+| `email`                 | string | ✅          | e-mail válido, único         |
+| `password`              | string | ✅          | mín. 8 caracteres            |
+| `password_confirmation` | string | ✅          | deve ser igual ao `password` |
 
 ```json
 {
@@ -99,10 +99,10 @@ Autentica um usuário e retorna um token de acesso.
 
 **Request body:**
 
-| Campo | Tipo | Obrigatório |
-|---|---|---|
-| `email` | string | ✅ |
-| `password` | string | ✅ |
+| Campo      | Tipo   | Obrigatório |
+| ---------- | ------ | ----------- |
+| `email`    | string | ✅          |
+| `password` | string | ✅          |
 
 ```json
 {
@@ -214,14 +214,14 @@ Adiciona saldo à carteira do usuário autenticado.
 
 **Request body:**
 
-| Campo | Tipo | Obrigatório | Regras |
-|---|---|---|---|
-| `amount` | numeric | ✅ | mín. 0.01, máx. 2 casas decimais |
-| `description` | string | ❌ | máx. 255 caracteres |
+| Campo         | Tipo    | Obrigatório | Regras                           |
+| ------------- | ------- | ----------- | -------------------------------- |
+| `amount`      | numeric | ✅          | mín. 0.01, máx. 2 casas decimais |
+| `description` | string  | ❌          | máx. 255 caracteres              |
 
 ```json
 {
-    "amount": 500.00,
+    "amount": 500.0,
     "description": "Recarga de carteira"
 }
 ```
@@ -256,16 +256,16 @@ Transfere saldo para outro usuário.
 
 **Request body:**
 
-| Campo | Tipo | Obrigatório | Regras |
-|---|---|---|---|
-| `recipient_id` | integer | ✅ | deve existir em `users`, não pode ser o próprio usuário |
-| `amount` | numeric | ✅ | mín. 0.01, máx. 2 casas decimais |
-| `description` | string | ❌ | máx. 255 caracteres |
+| Campo          | Tipo    | Obrigatório | Regras                                                  |
+| -------------- | ------- | ----------- | ------------------------------------------------------- |
+| `recipient_id` | integer | ✅          | deve existir em `users`, não pode ser o próprio usuário |
+| `amount`       | numeric | ✅          | mín. 0.01, máx. 2 casas decimais                        |
+| `description`  | string  | ❌          | máx. 255 caracteres                                     |
 
 ```json
 {
     "recipient_id": 2,
-    "amount": 100.00,
+    "amount": 100.0,
     "description": "Pagamento de aluguel"
 }
 ```
@@ -292,12 +292,12 @@ Transfere saldo para outro usuário.
 
 **Erros possíveis:**
 
-| Status | Motivo |
-|---|---|
-| `422` | Saldo insuficiente |
-| `422` | `recipient_id` inválido ou igual ao próprio `id` |
-| `429` | Rate limit excedido |
-| `500` | Erro interno |
+| Status | Motivo                                           |
+| ------ | ------------------------------------------------ |
+| `422`  | Saldo insuficiente                               |
+| `422`  | `recipient_id` inválido ou igual ao próprio `id` |
+| `429`  | Rate limit excedido                              |
+| `500`  | Erro interno                                     |
 
 ---
 
@@ -306,15 +306,16 @@ Transfere saldo para outro usuário.
 Estorna uma transação anterior.
 
 **Quem pode estornar:**
+
 - O próprio dono da transação (usuário que realizou o depósito ou a transferência)
 - Qualquer usuário com `user_type = admin`
 
 **Request body:**
 
-| Campo | Tipo | Obrigatório | Regras |
-|---|---|---|---|
-| `transaction_id` | integer | ✅ | deve existir em `transactions` |
-| `reason` | string | ✅ | máx. 255 caracteres |
+| Campo            | Tipo    | Obrigatório | Regras                         |
+| ---------------- | ------- | ----------- | ------------------------------ |
+| `transaction_id` | integer | ✅          | deve existir em `transactions` |
+| `reason`         | string  | ✅          | máx. 255 caracteres            |
 
 ```json
 {
@@ -346,12 +347,12 @@ Estorna uma transação anterior.
 
 **Erros possíveis:**
 
-| Status | Motivo |
-|---|---|
-| `403` | Usuário não autorizado a estornar essa transação |
-| `422` | Transação já foi estornada |
-| `422` | Saldo insuficiente para estornar (no caso de depósito) |
-| `404` | Transação não encontrada |
+| Status | Motivo                                                 |
+| ------ | ------------------------------------------------------ |
+| `403`  | Usuário não autorizado a estornar essa transação       |
+| `422`  | Transação já foi estornada                             |
+| `422`  | Saldo insuficiente para estornar (no caso de depósito) |
+| `404`  | Transação não encontrada                               |
 
 ---
 
@@ -361,13 +362,13 @@ Retorna o histórico paginado de transações do usuário autenticado.
 
 **Query parameters (todos opcionais):**
 
-| Parâmetro | Tipo | Valores aceitos | Padrão |
-|---|---|---|---|
-| `type` | string | `deposit`, `transfer` | — |
-| `status` | string | `completed`, `reversed` | — |
-| `from` | date | `YYYY-MM-DD` | — |
-| `to` | date | `YYYY-MM-DD` | — |
-| `per_page` | integer | 1 a 100 | 20 |
+| Parâmetro  | Tipo    | Valores aceitos         | Padrão |
+| ---------- | ------- | ----------------------- | ------ |
+| `type`     | string  | `deposit`, `transfer`   | —      |
+| `status`   | string  | `completed`, `reversed` | —      |
+| `from`     | date    | `YYYY-MM-DD`            | —      |
+| `to`       | date    | `YYYY-MM-DD`            | —      |
+| `per_page` | integer | 1 a 100                 | 20     |
 
 **Exemplo:**
 
@@ -410,6 +411,7 @@ GET /api/transactions?type=transfer&status=completed&from=2026-01-01&per_page=10
 Retorna os detalhes de uma transação específica.
 
 Acesso permitido apenas para:
+
 - O remetente da transação (`user_id`)
 - O destinatário da transação (`recipient_user_id`)
 - Usuários com `user_type = admin`
